@@ -4,7 +4,7 @@ import { useToast } from '../components/ToastProvider';
 import { BillRepository, LogRepository } from '../db/repositories';
 import { parseExcel, exportToExcel } from '../services/excel';
 import type { Bill } from '../db/types';
-import { VirtuosoGrid } from 'react-virtuoso';
+
 
 export const BillCollectionPage: React.FC = () => {
     const [bills, setBills] = useState<Bill[]>([]);
@@ -124,22 +124,23 @@ export const BillCollectionPage: React.FC = () => {
 
     const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'unpaid'>('all');
 
-    // Debounce search
-    const [debouncedSearch, setDebouncedSearch] = useState(search);
-    useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(search), 300);
-        return () => clearTimeout(timer);
-    }, [search]);
+
 
     const filteredBills = useMemo(() => {
         return bills.filter(b => {
-            const normalize = (str: string) => str.toLowerCase().replace(/\s+/g, '');
-            const searchNormalized = normalize(debouncedSearch);
+            // 1. Split search into individual words (tokens)
+            const searchTokens = search.toLowerCase().trim().split(/\s+/);
 
-            const matchesSearch = normalize(b.name).includes(searchNormalized) ||
-                normalize(b.code).includes(searchNormalized) ||
-                normalize(b.installationID).includes(searchNormalized) ||
-                normalize(b.branchID).includes(searchNormalized);
+            // 2. Create a single searchable string from the record fields
+            const searchableText = `
+                ${b.name} 
+                ${b.code} 
+                ${b.installationID} 
+                ${b.branchID}
+            `.toLowerCase();
+
+            // 3. Check if EVERY token exists in the searchable text
+            const matchesSearch = searchTokens.every(token => searchableText.includes(token));
 
             if (!matchesSearch) return false;
 
@@ -148,7 +149,7 @@ export const BillCollectionPage: React.FC = () => {
 
             return true;
         });
-    }, [bills, debouncedSearch, filterStatus]);
+    }, [bills, search, filterStatus]);
 
     const totalCollected = useMemo(() => {
         return bills
@@ -165,7 +166,7 @@ export const BillCollectionPage: React.FC = () => {
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[calc(100vh-80px)] flex flex-col relative">
             {/* Mobile Compact Header */}
-            <div className="block sm:hidden flex-shrink-0 z-10 bg-gray-50 dark:bg-gray-900 pb-4 pt-2">
+            <div className="relative block sm:hidden flex-shrink-0 z-10 bg-gray-50 dark:bg-gray-900 pb-4 pt-2">
                 <div className="flex gap-2 items-center mb-3">
                     <div className="relative flex-grow">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -364,85 +365,71 @@ export const BillCollectionPage: React.FC = () => {
                     <p className="text-lg text-gray-500 dark:text-gray-400">No results found for "{search}"</p>
                 </div>
             ) : (
-                <div className="flex-grow -mx-4 sm:mx-0">
-                    <VirtuosoGrid
-                        useWindowScroll
-                        data={filteredBills}
-                        totalCount={filteredBills.length}
-                        itemContent={(_: number, bill: Bill) => (
-                            <div className="p-2">
-                                <div className="group bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-700 transition-all duration-200 flex flex-col gap-4 h-full">
-                                    <div className="flex justify-between items-start">
-                                        <div className="space-y-1 overflow-hidden">
-                                            <h3 className="font-bold text-gray-900 dark:text-white line-clamp-1" title={bill.name}>
-                                                {bill.name}
-                                            </h3>
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 w-fit">
-                                                    Branch: {bill.branchID}
-                                                </span>
-                                                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
-                                                    Inst: {bill.installationID}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => togglePayment(bill)}
-                                            className={`p-2 rounded-xl transition-all duration-200 ${bill.paymentStatus === 'paid'
-                                                ? 'bg-green-100 text-green-600 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
-                                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
-                                                }`}
-                                            title={bill.paymentStatus === 'paid' ? "Mark as Unpaid" : "Mark as Paid"}
-                                        >
-                                            {bill.paymentStatus === 'paid' ? (
-                                                <CheckCircle className="h-6 w-6" />
-                                            ) : (
-                                                <div className="h-6 w-6 rounded-full border-2 border-current" />
-                                            )}
-                                        </button>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3 py-3 border-t border-b border-gray-50 dark:border-gray-700/50 mt-auto">
-                                        <div>
-                                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">LBP</p>
-                                            <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                                                {Number(bill.billLBP).toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">USD</p>
-                                            <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                                                ${Number(bill.billUSD).toFixed(2)}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-between items-center text-xs">
-                                        <span className={`px-2.5 py-1 rounded-full font-medium border ${bill.paymentStatus === 'paid'
-                                            ? 'bg-green-50 text-green-700 border-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30'
-                                            : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/30'
-                                            }`}>
-                                            {bill.paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
-                                        </span>
-                                        {bill.paymentDate && (
-                                            <span className="text-gray-400 font-medium">
-                                                {new Date(bill.paymentDate).toLocaleDateString()}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+                    {filteredBills.map((bill) => (
+                        <div key={bill.id} className="p-2">
+                            <div className="group bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-700 transition-all duration-200 flex flex-col gap-4 h-full">
+                                <div className="flex justify-between items-start">
+                                    <div className="space-y-1 overflow-hidden">
+                                        <h3 className="font-bold text-gray-900 dark:text-white line-clamp-1" title={bill.name}>
+                                            {bill.name}
+                                        </h3>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 w-fit">
+                                                Branch: {bill.branchID}
                                             </span>
+                                            <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                                                Inst: {bill.installationID}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => togglePayment(bill)}
+                                        className={`p-2 rounded-xl transition-all duration-200 ${bill.paymentStatus === 'paid'
+                                            ? 'bg-green-100 text-green-600 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
+                                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+                                            }`}
+                                        title={bill.paymentStatus === 'paid' ? "Mark as Unpaid" : "Mark as Paid"}
+                                    >
+                                        {bill.paymentStatus === 'paid' ? (
+                                            <CheckCircle className="h-6 w-6" />
+                                        ) : (
+                                            <div className="h-6 w-6 rounded-full border-2 border-current" />
                                         )}
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 py-3 border-t border-b border-gray-50 dark:border-gray-700/50 mt-auto">
+                                    <div>
+                                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">LBP</p>
+                                        <p className="font-mono font-semibold text-gray-900 dark:text-white">
+                                            {Number(bill.billLBP).toLocaleString()}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">USD</p>
+                                        <p className="font-mono font-semibold text-gray-900 dark:text-white">
+                                            ${Number(bill.billUSD).toFixed(2)}
+                                        </p>
                                     </div>
                                 </div>
+
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className={`px-2.5 py-1 rounded-full font-medium border ${bill.paymentStatus === 'paid'
+                                        ? 'bg-green-50 text-green-700 border-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30'
+                                        : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/30'
+                                        }`}>
+                                        {bill.paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
+                                    </span>
+                                    {bill.paymentDate && (
+                                        <span className="text-gray-400 font-medium">
+                                            {new Date(bill.paymentDate).toLocaleDateString()}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
-                        )}
-                        components={{
-                            List: React.forwardRef((props, ref) => (
-                                <div
-                                    {...props}
-                                    ref={ref as React.ForwardedRef<HTMLDivElement>}
-                                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-                                />
-                            ))
-                        }}
-                    />
+                        </div>
+                    ))}
                 </div>
             )}
         </div>

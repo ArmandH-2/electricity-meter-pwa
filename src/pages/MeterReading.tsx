@@ -44,25 +44,25 @@ export const MeterReadingPage: React.FC = () => {
                 throw new Error("No data found in the Excel file.");
             }
 
-            // Map raw data to MeterReading interface
+            // Map raw data to MeterReading interface with strict column mapping
             const mappedData: MeterReading[] = rawData.map((row: any) => ({
-                code: String(row.Code ?? row.code ?? ''),
-                installationID: String(row.Installation ?? row.installationID ?? ''),
-                branchID: String(row.Branch ?? row.branchID ?? ''),
-                compteur: String(row.Compteur ?? row.compteur ?? ''),
-                inxDep: String(row['Inx-Dep'] ?? row.inxDep ?? ''),
-                name: String(row.Name ?? row.name ?? ''),
-                usage: String(row.Usage ?? row.usage ?? ''),
-                seq: String(row.SEQ ?? row.seq ?? ''),
-                meterValue: null,
-                obs: '',
+                code: String(row['Code'] ?? ''),
+                installationID: String(row['Installation'] ?? ''),
+                branchID: String(row['Branch'] ?? ''),
+                compteur: String(row['Compteur'] ?? ''),
+                inxDep: String(row['Inx-Dep'] ?? ''),
+                name: String(row['Name'] ?? ''),
+                usage: String(row['Usage'] ?? ''),
+                seq: String(row['SEQ'] ?? ''),
+                meterValue: row['Meter Values'] ? String(row['Meter Values']) : null,
+                obs: String(row['OBS'] ?? ''),
                 readingDate: null,
                 flagged: false
-            })).filter(item => item.branchID); // Filter out empty rows based on branchID
+            })).filter(item => item.installationID || item.name); // Basic validation
 
             if (mappedData.length === 0) {
                 const foundColumns = Object.keys(rawData[0] || {}).join(", ");
-                throw new Error(`Could not map data. Found columns: ${foundColumns}. Expected: Branch, Code, Installation, etc.`);
+                throw new Error(`Could not map data. Found columns: ${foundColumns}. Expected: Code, Installation, Branch, Compteur, Inx-Dep, Meter Values, Name, OBS, Usage, SEQ.`);
             }
 
             await ReadingRepository.addAll(mappedData);
@@ -79,7 +79,19 @@ export const MeterReadingPage: React.FC = () => {
     };
 
     const handleExport = () => {
-        exportToExcel(readings, `readings_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+        const exportData = readings.map(r => ({
+            'Code': r.code,
+            'Installation': r.installationID,
+            'Branch': r.branchID,
+            'Compteur': r.compteur,
+            'Inx-Dep': r.inxDep,
+            'Meter Values': r.meterValue || '',
+            'Name': r.name,
+            'OBS': r.obs,
+            'Usage': r.usage,
+            'SEQ': r.seq
+        }));
+        exportToExcel(exportData, `readings_export_${new Date().toISOString().split('T')[0]}.xlsx`);
         showToast('Readings exported successfully', 'success');
     };
 

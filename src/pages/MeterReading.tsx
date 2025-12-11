@@ -4,7 +4,7 @@ import { useToast } from '../components/ToastProvider';
 import { ReadingRepository, LogRepository } from '../db/repositories';
 import { parseExcel, exportToExcel } from '../services/excel';
 import type { MeterReading } from '../db/types';
-import { VirtuosoGrid } from 'react-virtuoso';
+
 
 export const MeterReadingPage: React.FC = () => {
     const [readings, setReadings] = useState<MeterReading[]>([]);
@@ -108,32 +108,34 @@ export const MeterReadingPage: React.FC = () => {
 
     const [filterStatus, setFilterStatus] = useState<'all' | 'read' | 'unread'>('all');
 
-    // Debounce search
-    const [debouncedSearch, setDebouncedSearch] = useState(search);
-    useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(search), 300);
-        return () => clearTimeout(timer);
-    }, [search]);
+
 
     const filteredReadings = React.useMemo(() => {
         return readings.filter(r => {
-            const normalize = (str: string) => str.toLowerCase().replace(/\s+/g, '');
-            const searchNormalized = normalize(debouncedSearch);
+            // 1. Split search into individual words (tokens)
+            const searchTokens = search.toLowerCase().trim().split(/\s+/);
 
-            const matchesSearch = normalize(r.name).includes(searchNormalized) ||
-                normalize(r.code).includes(searchNormalized) ||
-                normalize(r.installationID).includes(searchNormalized) ||
-                normalize(r.branchID).includes(searchNormalized) ||
-                normalize(r.compteur).includes(searchNormalized);
+            // 2. Create a single searchable string from the record fields
+            const searchableText = `
+                ${r.name} 
+                ${r.code} 
+                ${r.installationID} 
+                ${r.branchID} 
+                ${r.compteur}
+            `.toLowerCase();
+
+            // 3. Check if EVERY token exists in the searchable text
+            const matchesSearch = searchTokens.every(token => searchableText.includes(token));
 
             if (!matchesSearch) return false;
 
+            // Keep existing status filters
             if (filterStatus === 'read') return r.meterValue !== null && r.meterValue !== '';
             if (filterStatus === 'unread') return r.meterValue === null || r.meterValue === '';
 
             return true;
         });
-    }, [readings, debouncedSearch, filterStatus]);
+    }, [readings, search, filterStatus]);
 
     // Virtualization logic
     // const GUTTER_SIZE = 24;
@@ -144,7 +146,7 @@ export const MeterReadingPage: React.FC = () => {
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[calc(100vh-80px)] flex flex-col relative">
             {/* Mobile Compact Header */}
-            <div className="block sm:hidden flex-shrink-0 z-10 bg-gray-50 dark:bg-gray-900 pb-4 pt-2">
+            <div className="relative block sm:hidden flex-shrink-0 z-10 bg-gray-50 dark:bg-gray-900 pb-4 pt-2">
                 <div className="flex gap-2 items-center mb-3">
                     <div className="relative flex-grow">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -322,27 +324,14 @@ export const MeterReadingPage: React.FC = () => {
                     <p className="text-lg text-gray-500 dark:text-gray-400">No results found for "{search}"</p>
                 </div>
             ) : (
-                <div className="flex-grow -mx-4 sm:mx-0">
-                    <VirtuosoGrid
-                        useWindowScroll
-                        data={filteredReadings}
-                        totalCount={filteredReadings.length}
-                        itemContent={(_: number, reading: MeterReading) => (
-                            <MeterReadingCard
-                                reading={reading}
-                                onUpdate={handleUpdate}
-                            />
-                        )}
-                        components={{
-                            List: React.forwardRef((props, ref) => (
-                                <div
-                                    {...props}
-                                    ref={ref as React.ForwardedRef<HTMLDivElement>}
-                                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-                                />
-                            ))
-                        }}
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+                    {filteredReadings.map((reading) => (
+                        <MeterReadingCard
+                            key={reading.id}
+                            reading={reading}
+                            onUpdate={handleUpdate}
+                        />
+                    ))}
                 </div>
             )}
         </div>

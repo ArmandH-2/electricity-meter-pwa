@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Download, Search, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, Download, Search } from 'lucide-react';
+import { MeterReadingCard } from '../components/MeterReadingCard';
 import { useToast } from '../components/ToastProvider';
 import { ReadingRepository, LogRepository } from '../db/repositories';
 import { parseExcel, exportToExcel } from '../services/excel';
@@ -338,94 +339,4 @@ export const MeterReadingPage: React.FC = () => {
     );
 };
 
-interface MeterReadingCardProps {
-    reading: MeterReading;
-    onUpdate: (reading: MeterReading, field: keyof MeterReading, value: string) => void;
-}
 
-const MeterReadingCard = React.memo(({ reading, onUpdate }: MeterReadingCardProps) => {
-    const [localValue, setLocalValue] = useState(reading.meterValue || '');
-
-    // Sync local state if prop changes externally (e.g. import or reset)
-    useEffect(() => {
-        setLocalValue(reading.meterValue || '');
-    }, [reading.meterValue]);
-
-    const handleBlur = () => {
-        if (localValue !== (reading.meterValue || '')) {
-            onUpdate(reading, 'meterValue', localValue);
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            (e.currentTarget as HTMLInputElement).blur(); // Trigger blur to save
-        }
-    };
-
-    return (
-        <div className="p-2">
-            <div className="group bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-700 transition-all duration-200 flex flex-col gap-4 h-full">
-                <div className="flex justify-between items-start">
-                    <div className="space-y-1 overflow-hidden">
-                        <h3 className="font-bold text-gray-900 dark:text-white line-clamp-1" title={reading.name}>
-                            {reading.name}
-                        </h3>
-                        <div className="flex flex-col gap-0.5">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 w-fit">
-                                Branch: {reading.branchID}
-                            </span>
-                            <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                                Meter: {reading.compteur}
-                            </span>
-                            <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
-                                Inst: {reading.installationID}
-                            </span>
-                        </div>
-                    </div>
-                    {reading.meterValue ? (
-                        <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-full flex-shrink-0">
-                            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                        </div>
-                    ) : (
-                        <div className="p-1.5 bg-amber-100 dark:bg-amber-900/30 rounded-full flex-shrink-0">
-                            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                        </div>
-                    )}
-                </div>
-
-                <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-700 mt-auto">
-                    <div>
-                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">
-                            Meter Value
-                        </label>
-                        <input
-                            type="number"
-                            inputMode="decimal"
-                            value={localValue}
-                            onChange={(e) => setLocalValue(e.target.value)}
-                            onBlur={handleBlur}
-                            onKeyDown={handleKeyDown}
-                            placeholder="0.00"
-                            className="block w-full rounded-lg border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 bg-gray-50 dark:bg-gray-900 dark:text-white dark:ring-gray-700 transition-all font-mono"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">
-                            Observations
-                        </label>
-                        <input
-                            type="text"
-                            value={reading.obs || ''}
-                            onChange={(e) => onUpdate(reading, 'obs', e.target.value)}
-                            placeholder="Add notes..."
-                            className="block w-full rounded-lg border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 bg-gray-50 dark:bg-gray-900 dark:text-white dark:ring-gray-700 transition-all"
-                        />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}, (prevProps, nextProps) => {
-    return prevProps.reading === nextProps.reading;
-});

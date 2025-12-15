@@ -44,21 +44,35 @@ export const MeterReadingPage: React.FC = () => {
                 throw new Error("No data found in the Excel file.");
             }
 
+            // Clear existing readings before importing new ones to avoid duplicates
+            await ReadingRepository.clearAll();
+
             // Map raw data to MeterReading interface with strict column mapping
-            const mappedData: MeterReading[] = rawData.map((row: any) => ({
-                code: String(row['Code'] ?? ''),
-                installationID: String(row['Installation'] ?? ''),
-                branchID: String(row['Branch'] ?? ''),
-                compteur: String(row['Compteur'] ?? ''),
-                inxDep: String(row['Inx-Dep'] ?? ''),
-                name: String(row['Name'] ?? ''),
-                usage: String(row['Usage'] ?? ''),
-                seq: String(row['SEQ'] ?? ''),
-                meterValue: row['Meter Values'] ? String(row['Meter Values']) : null,
-                obs: String(row['OBS'] ?? ''),
-                readingDate: null,
-                flagged: false
-            })).filter(item => item.installationID || item.name); // Basic validation
+            const mappedData: MeterReading[] = rawData.map((row: any) => {
+                // Helper to safely get string value, preserving '0' but treating undefined/null as empty string
+                const getString = (val: any) => (val !== undefined && val !== null) ? String(val).trim() : '';
+
+                // Special handling for meter value to allow "0" but treat empty/null/undefined as null
+                let meterVal: string | null = null;
+                if (row['Meter Values'] !== undefined && row['Meter Values'] !== null && String(row['Meter Values']).trim() !== '') {
+                    meterVal = String(row['Meter Values']);
+                }
+
+                return {
+                    code: getString(row['Code']),
+                    installationID: getString(row['Installation']),
+                    branchID: getString(row['Branch']),
+                    compteur: getString(row['Compteur']),
+                    inxDep: getString(row['Inx-Dep']),
+                    name: getString(row['Name']),
+                    usage: getString(row['Usage']),
+                    seq: getString(row['SEQ']),
+                    meterValue: meterVal,
+                    obs: getString(row['OBS']),
+                    readingDate: null,
+                    flagged: false
+                };
+            }).filter(item => item.installationID || item.name); // Basic validation
 
             if (mappedData.length === 0) {
                 const foundColumns = Object.keys(rawData[0] || {}).join(", ");

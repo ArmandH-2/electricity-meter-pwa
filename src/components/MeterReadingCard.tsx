@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, Pencil } from 'lucide-react';
 import type { MeterReading } from '../db/types';
 
 interface MeterReadingCardProps {
@@ -9,15 +9,26 @@ interface MeterReadingCardProps {
 
 export const MeterReadingCard = React.memo(({ reading, onUpdate }: MeterReadingCardProps) => {
     const [localValue, setLocalValue] = useState(reading.meterValue || '');
+    const [isEditing, setIsEditing] = useState(!reading.meterValue);
+    const [shouldFocus, setShouldFocus] = useState(false);
 
     useEffect(() => {
         setLocalValue(reading.meterValue || '');
+        // If we have a value, we are not editing. If we don't, we are editing.
+        setIsEditing(!reading.meterValue);
+        // Reset focus state when reading changes
+        setShouldFocus(false);
     }, [reading.meterValue]);
 
     const handleBlur = () => {
         if (localValue !== (reading.meterValue || '')) {
             onUpdate(reading, 'meterValue', localValue);
         }
+        // Only exit edit mode if we have a value
+        if (localValue) {
+            setIsEditing(false);
+        }
+        setShouldFocus(false);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -25,6 +36,11 @@ export const MeterReadingCard = React.memo(({ reading, onUpdate }: MeterReadingC
             e.preventDefault();
             e.currentTarget.blur();
         }
+    };
+
+    const handleEditClick = () => {
+        setIsEditing(true);
+        setShouldFocus(true);
     };
 
     return (
@@ -70,17 +86,36 @@ export const MeterReadingCard = React.memo(({ reading, onUpdate }: MeterReadingC
                         <label className="block text-[10px] font-bold text-blue-600 dark:text-blue-400 mb-1 uppercase tracking-wider">
                             New Index
                         </label>
-                        <input
-                            type="number"
-                            inputMode="decimal"
-                            enterKeyHint="done"
-                            value={localValue}
-                            onChange={(e) => setLocalValue(e.target.value)}
-                            onBlur={handleBlur}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Enter reading"
-                            className="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 text-sm font-mono font-medium bg-white dark:bg-gray-900 dark:text-white dark:ring-gray-700"
-                        />
+                        {isEditing ? (
+                            <input
+                                type="number"
+                                inputMode="decimal"
+                                enterKeyHint="done"
+                                value={localValue}
+                                onChange={(e) => setLocalValue(e.target.value)}
+                                onBlur={handleBlur}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Enter reading"
+                                autoFocus={shouldFocus}
+                                className="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 text-sm font-mono font-medium bg-white dark:bg-gray-900 dark:text-white dark:ring-gray-700"
+                            />
+                        ) : (
+                            <div className="relative flex items-center">
+                                <div
+                                    onClick={handleEditClick}
+                                    className="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-gray-700 bg-gray-50 dark:bg-gray-800/50 dark:text-white text-sm font-mono font-medium cursor-pointer hover:ring-blue-400 transition-all"
+                                >
+                                    {localValue}
+                                </div>
+                                <button
+                                    onClick={handleEditClick}
+                                    className="absolute right-2 p-1 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                    title="Edit reading"
+                                >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
